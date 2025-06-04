@@ -1,2 +1,2 @@
 # sra
-self reference algorithm
+Measurement Comparision For SRA App
