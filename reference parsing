@@ -1,0 +1,55 @@
+import os
+import pandas as pd
+from datetime import datetime
+
+def parse_voltage_current_lists(folder_path, output_pickle_path):
+    combined_df = pd.DataFrame(columns=['timestamp', 'mod_temp', 'mod_irr', 'U in V', 'I in A'])
+
+    for file_name in os.listdir(folder_path):
+        if file_name.lower().endswith(('.xls', '.xlsx')):
+            file_path = os.path.join(folder_path, file_name)
+            print(f"📂 Processing: {file_name}")
+            try:
+                # Extract timestamp from filename
+                base_name = os.path.splitext(file_name)[0]
+                dt_obj = datetime.strptime(base_name, "%d-%m-%Y  %H_%M_%S")
+                timestamp_str = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+
+                engine = 'xlrd' if file_name.lower().endswith('.xls') else 'openpyxl'
+
+                # Step 1: Read a few rows to get mod_temp and mod_irr (row index 13)
+                pre_df = pd.read_excel(file_path, engine=engine, nrows=10, header=None)
+                mod_temp = pre_df.iloc[5, 1]  # 6th column = index 5
+                mod_irr = pre_df.iloc[6, 1]   # 7th column = index 6
+
+                # Step 2: Now read the main data block
+                df = pd.read_excel(file_path, engine=engine, skiprows=16, usecols=[0, 1])
+                df.columns = ['U in V', 'I in A']
+
+                u_list = df['U in V'].tolist()
+                i_list = df['I in A'].tolist()
+
+                # Step 3: Add a row to combined_df
+                row_df = pd.DataFrame({
+                    'timestamp': [timestamp_str],
+                    'mod_temp': [mod_temp],
+                    'mod_irr': [mod_irr],
+                    'U in V': [u_list],
+                    'I in A': [i_list]
+                })
+
+                combined_df = pd.concat([combined_df, row_df], ignore_index=True)
+                print(f"✅ Loaded: {file_name} ({len(u_list)} U, {len(i_list)} I values)")
+
+            except Exception as e:
+                print(f"❌ Failed to process {file_name}: {e}")
+
+    # Save the final DataFrame
+    combined_df.to_pickle(output_pickle_path)
+    print(f"\n✅ All files parsed and saved to: {output_pickle_path}")
+    print(f"📊 Final shape: {combined_df.shape}")
+
+# Usage
+folder_path = r"F:\testingllmpackage\testingllmpackage\Datewisedata\PVT ALL"
+output_pickle = "u_i_dataframe_with_timestamp_and_temp_irr.pkl"
+parse_voltage_current_lists(folder_path, output_pickle)
